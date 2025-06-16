@@ -16,11 +16,18 @@
 #include "Map.h"
 #include <fmt/format.h>
 #include "Corpse.h"
+#include "Group.h"
+#include "ObjectMgr.h"
 
 using namespace Acore::ChatCommands;
 using namespace WorldPackets;
 
-extern std::map<uint64, bool> playerAoeLootEnabled;
+std::map<uint64, bool> playerAoeLootEnabled;
+
+// Define the roll vote enum value - use the correct RollVote enum
+#ifndef NOT_EMITED_YET
+#define NOT_EMITED_YET RollVote(0)
+#endif
 
 bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
 {
@@ -46,6 +53,7 @@ bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
     return true;
 }
 
+
 ChatCommandTable AoeLootCommandScript::GetCommands() const
 {
     static ChatCommandTable aoeLootSubCommandTable =
@@ -57,7 +65,7 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
 
     static ChatCommandTable aoeLootCommandTable =
     {
-        { "aoeloot", nullptr, SEC_PLAYER, Console::No, aoeLootSubCommandTable }
+        { "aoeloot", aoeLootSubCommandTable }
     };
     
     return aoeLootCommandTable;
@@ -246,13 +254,11 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     if (lguid.IsGameObject())
     {
         GameObject* go = player->GetMap()->GetGameObject(lguid);
-        
         if (!go || ((go->GetOwnerGUID() != player->GetGUID() && go->GetGoType() != GAMEOBJECT_TYPE_FISHINGHOLE) && !go->IsWithinDistInMap(player, aoeDistance)))
         {
             player->SendLootRelease(lguid);
             return false;
         }
-        
         loot = &go->loot;
     }
     else if (lguid.IsItem())
@@ -260,11 +266,9 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
         Item* pItem = player->GetItemByGuid(lguid);
         if (!pItem)
         {
-
             player->SendLootRelease(lguid);
             return false;
         }
-        
         loot = &pItem->loot;
     }
     else if (lguid.IsCorpse())
@@ -272,7 +276,7 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
         Corpse* bones = ObjectAccessor::GetCorpse(*player, lguid);
         if (!bones)
         {
-            player->SendLootRelease(lguid); 
+            player->SendLootRelease(lguid);
             return false;
         }
         loot = &bones->loot;
@@ -280,41 +284,101 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     else
     {
         Creature* creature = player->GetMap()->GetCreature(lguid);
-
         // Skip distance check for dead creatures (corpses)
         // Keep distance check for pickpocketing (live creatures)
         bool isPickpocketing = creature && creature->IsAlive() && player->IsClass(CLASS_ROGUE, CLASS_CONTEXT_ABILITY) && creature->loot.loot_type == LOOT_PICKPOCKETING;
-        
         // Only check distance for pickpocketing, not for corpse looting
         if (isPickpocketing && !creature->IsWithinDistInMap(player, INTERACTION_DISTANCE))
         {
             player->SendLootError(lguid, LOOT_ERROR_TOO_FAR);
             return false;
         }
-        
         loot = &creature->loot;
-
     }
 
     sScriptMgr->OnPlayerAfterCreatureLoot(player);
     if (!loot)
         return false;
 
-    InventoryResult msg;
-    LootItem* lootItem = player->StoreLootItem(lootSlot, loot, msg);
+    // --- Begin standard loot logic for solo/group ---
+    Group* group = player->GetGroup();
+    LootItem* lootItem = nullptr;
+    InventoryResult msg = EQUIP_ERR_OK;
+    bool isGroupLoot = false;
+    bool isFFA = loot->items[lootSlot].freeforall;
+    bool isMasterLooter = false;
+    bool isRoundRobin = false;
+    bool isThreshold = false;
+    LootMethod lootMethod = GROUP_LOOT;
+    uint8 groupLootThreshold = 2; // Default: Uncommon
+
+    if (group)
+    {
+        lootMethod = group->GetLootMethod();
+        groupLootThreshold = group->GetLootThreshold();
+        isMasterLooter = (lootMethod == MASTER_LOOT);
+        isRoundRobin = (lootMethod == ROUND_ROBIN);
+        isGroupLoot = (lootMethod == GROUP_LOOT || lootMethod == NEED_BEFORE_GREED);
+        ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(loot->items[lootSlot].itemid);
+        isThreshold = (itemTemplate && itemTemplate->Quality >= groupLootThreshold);
+    }
+
+    // If in group and item meets group loot threshold, trigger group roll
+    if (group && isGroupLoot && isThreshold && !isFFA && !isMasterLooter)
+    {
+        // Use the existing game's SendLootStartRoll - it doesn't have distance checks
+        if (lootSlot < loot->items.size() && !loot->items[lootSlot].is_blocked)
+        {
+            // Create Roll object using the constructor: Roll(ObjectGuid _guid, LootItem const &li)
+            Roll roll(lguid, loot->items[lootSlot]);
+            roll.itemSlot = lootSlot;
+            roll.setLoot(loot);
+            
+            // Initialize player votes for group members
+            for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
+            {
+                Player* member = itr->GetSource();
+                if (member && member->IsInWorld() && !member->isDead())
+                {
+                    roll.playerVote[member->GetGUID()] = RollVote(0);
+                    roll.totalPlayersRolling++;
+                }
+            }
+            
+            // Call SendLootStartRoll with 60 second countdown
+            group->SendLootStartRoll(60, player->GetMapId(), roll);
+        }
+        return true;
+    }
+    else if (group && isMasterLooter && !isFFA)
+    {
+        // Master looter: only master looter can loot
+        if (group->GetMasterLooterGuid() != player->GetGUID())
+        {
+            player->SendLootError(lguid, LOOT_ERROR_MASTER_OTHER);
+            return false;
+        }
+    }
+    else if (group && isRoundRobin && loot->roundRobinPlayer && loot->roundRobinPlayer != player->GetGUID())
+    {
+        // Round robin: only designated player can loot
+        return false;
+    }
+
+    // If not blocked by group loot, proceed to loot the item
+    lootItem = player->StoreLootItem(lootSlot, loot, msg);
     if (msg != EQUIP_ERR_OK && lguid.IsItem() && loot->loot_type != LOOT_CORPSE)
     {
         lootItem->is_looted = true;
         loot->NotifyItemRemoved(lootItem->itemIndex);
         loot->unlootedCount--;
-
         player->SendItemRetrievalMail(lootItem->itemid, lootItem->count);
     }
 
     // If player is removing the last LootItem, delete the empty container
     if (loot->isLooted() && lguid.IsItem())
     {
-        ProcessLootRelease(lguid, player, loot);   
+        ProcessLootRelease(lguid, player, loot);
     }
     return true;
 }
