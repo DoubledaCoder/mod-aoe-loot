@@ -4,17 +4,18 @@
 #
 #    AOELoot.Enable
 #         Description: Enables Module
-#         Default:    0 - (Disabled)
-#                     1 - (Enabled)
-#
+#         Default:    1 - (Enabled)
+#                     0 - (Disabled)
+# 
+
 
 AOELoot.Enable = 1
 
 #
 #    AOELoot.Message
 #         Description: Enable message on login
-#         Default:    0 - (Disabled)
-#                     1 - (Enabled)
+#         Default:    1 - (Enabled)
+#                     0 - (Disabled)
 #
 
 AOELoot.Message = 1
@@ -25,7 +26,7 @@ AOELoot.Message = 1
 #       Default:    55.0
 #
 
-AOELoot.Range = 85.0
+AOELoot.Range = 55.0
 
 #
 #   AOELoot.MoneyShareDistanceMultiplier
