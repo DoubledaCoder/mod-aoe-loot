@@ -44,6 +44,10 @@ public:
     static bool HandleAoeLootOnCommand(ChatHandler* handler, Optional<std::string> args);
     static bool HandleAoeLootOffCommand(ChatHandler* handler, Optional<std::string> args);
     static bool HandleStartAoeLootCommand(ChatHandler* handler, Optional<std::string> args);
+    static bool HandleAoeLootToggleCommand(ChatHandler* handler, Optional<std::string> args);
+    static bool HandleAoeLootDebugOnCommand(ChatHandler* handler, Optional<std::string> args);
+    static bool HandleAoeLootDebugOffCommand(ChatHandler* handler, Optional<std::string> args);
+    static bool HandleAoeLootDebugToggleCommand(ChatHandler* handler, Optional<std::string> args);
     
     // Core loot processing functions
     static bool ProcessLootSlot(Player* player, ObjectGuid lguid, uint8 lootSlot);
