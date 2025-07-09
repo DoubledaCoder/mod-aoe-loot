@@ -47,12 +47,12 @@ AOELoot.MoneyShareDistanceMultiplier = 2.0
 AOELoot.Group = 1
 
 #
-#   AOELoot.LootThreshold
-#       Description: Minimum item quality for group loot rolls (0=Poor, 1=Common, 2=Uncommon, 3=Rare, 4=Epic, 5=Legendary)
-#       Default:    2 (Uncommon)
+#   AOELoot.CorpseThreshold
+#       Description: The number of corpses that need to be in range for AoE looting to initiate (If the number of corpses is lower than this number in the "AOELoot.Range" AoE looting will not initiate and the default in-game looting logic will run instead).
+#       Default:    2 (Default) If the number of corpses in your AOELoot.Range is 1, the default game looting will be used instead of AoE loot.
 #
 
-AOELoot.LootThreshold = 2
+AOELoot.CorpseThreshold = 2
 
 
 #   AOELoot.Debug
