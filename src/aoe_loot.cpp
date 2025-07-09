@@ -265,8 +265,8 @@ bool AoeLootCommandScript::HandleStartAoeLootCommand(ChatHandler* handler, Optio
     // Get valid corpses
     auto validCorpses = GetValidCorpses(player, range);
 
-    uint32 LootThreshold = sConfigMgr->GetOption<uint32>("AOELoot.LootThreshold", 2);
-    if (validCorpses.size() < LootThreshold)
+    uint32 CorpseThreshold = sConfigMgr->GetOption<uint32>("AOELoot.CorpseThreshold", 2);
+    if (validCorpses.size() < CorpseThreshold)
     {
         DebugMessage(player, "Not enough corpses for AOE loot. Defaulting to normal looting.");
         return true;
