@@ -23,6 +23,7 @@ using namespace Acore::ChatCommands;
 using namespace WorldPackets;
 
 std::map<uint64, bool> playerAoeLootEnabled;
+std::map<uint64, bool> playerAoeLootDebug;
 
 bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
 {
@@ -51,9 +52,13 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
 {
     static ChatCommandTable aoeLootSubCommandTable =
     {
-        { "startaoeloot",   HandleStartAoeLootCommand,  SEC_PLAYER, Console::No },
-        { "on",             HandleAoeLootOnCommand,     SEC_PLAYER, Console::No },
-        { "off",            HandleAoeLootOffCommand,    SEC_PLAYER, Console::No }
+        { "startaoeloot",   HandleStartAoeLootCommand,          SEC_PLAYER, Console::No },
+        { "toggle",         HandleAoeLootToggleCommand,         SEC_PLAYER, Console::No },
+        { "on",             HandleAoeLootOnCommand,             SEC_PLAYER, Console::No },
+        { "off",            HandleAoeLootOffCommand,            SEC_PLAYER, Console::No },
+        { "debug on",       HandleAoeLootDebugOnCommand,        SEC_PLAYER, Console::No },
+        { "debug toggle",   HandleAoeLootDebugToggleCommand,    SEC_PLAYER, Console::No },
+        { "debug off",      HandleAoeLootDebugOffCommand,       SEC_PLAYER, Console::No }
     };
 
     static ChatCommandTable aoeLootCommandTable =
@@ -93,10 +98,50 @@ bool AoeLootCommandScript::HandleAoeLootOffCommand(ChatHandler* handler, Optiona
     return true;
 }
 
+bool AoeLootCommandScript::HandleAoeLootToggleCommand(ChatHandler* handler, Optional<std::string> /*args*/)
+{
+    Player* player = handler->GetSession()->GetPlayer();
+    if (!player)
+        return true;
+    playerAoeLootEnabled[player->GetGUID().GetRawValue()] = !playerAoeLootEnabled[player->GetGUID().GetRawValue()];
+    handler->PSendSysMessage("AOE Loot toggled for your character.");
+    return true;
+}
+
+bool AoeLootCommandScript::HandleAoeLootDebugOnCommand(ChatHandler* handler, Optional<std::string> /*args*/)
+{
+    Player* player = handler->GetSession()->GetPlayer();
+    if (!player)
+        return true;
+    playerAoeLootDebug[player->GetGUID().GetRawValue()] = true;
+    handler->PSendSysMessage("AOE Loot debug mode enabled.");
+    return true;
+}
+
+bool AoeLootCommandScript::HandleAoeLootDebugOffCommand(ChatHandler* handler, Optional<std::string> /*args*/)
+{
+    Player* player = handler->GetSession()->GetPlayer();
+    if (!player)
+        return true;
+    playerAoeLootDebug[player->GetGUID().GetRawValue()] = false;
+    handler->PSendSysMessage("AOE Loot debug mode disabled.");
+    return true;
+}
+
+bool AoeLootCommandScript::HandleAoeLootDebugToggleCommand(ChatHandler* handler, Optional<std::string> /*args*/)
+{
+    Player* player = handler->GetSession()->GetPlayer();
+    if (!player)
+        return true;
+    playerAoeLootDebug[player->GetGUID().GetRawValue()] = !playerAoeLootDebug[player->GetGUID().GetRawValue()];
+    handler->PSendSysMessage("AOE Loot debug mode toggled.");
+    return true;
+}
+
 // Helper function for debug messages:
 void AoeLootCommandScript::DebugMessage(Player* player, const std::string& message)
 {
-    if (sConfigMgr->GetOption<bool>("AOELoot.Debug", false))
+    if (sConfigMgr->GetOption<bool>("AOELoot.Debug", false) || playerAoeLootDebug[player->GetGUID().GetRawValue()])
     {
         ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: {}", message);
     }
