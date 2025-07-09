@@ -17,7 +17,7 @@ AOELoot.Enable = 1
 #                     1 - (Enabled)
 #
 
-AOELoot.Message = 0
+AOELoot.Message = 1
 
 #
 #   AOELoot.Range
@@ -25,7 +25,15 @@ AOELoot.Message = 0
 #       Default:    55.0
 #
 
-AOELoot.Range = 55.0
+AOELoot.Range = 85.0
+
+#
+#   AOELoot.MoneyShareDistanceMultiplier
+#       Description: Distance multiplier for money sharing (multiplies AOELoot.Range)
+#       Default:    2.0
+#
+
+AOELoot.MoneyShareDistanceMultiplier = 2.0
 
 #
 #   AOELoot.Group
@@ -36,6 +44,14 @@ AOELoot.Range = 55.0
 #
 
 AOELoot.Group = 1
+
+#
+#   AOELoot.LootThreshold
+#       Description: Minimum item quality for group loot rolls (0=Poor, 1=Common, 2=Uncommon, 3=Rare, 4=Epic, 5=Legendary)
+#       Default:    2 (Uncommon)
+#
+
+AOELoot.LootThreshold = 2
 
 
 #   AOELoot.Debug
