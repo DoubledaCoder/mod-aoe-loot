@@ -69,7 +69,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 * [TerraByte-tbwps](https://github.com/TerraByte-tbwps) - Author and maintainer
 * Original AzerothCore community and contributors
-* This module was inspired by sudlud's https://github.com/azerothcore/mod-aoe-loot
 
 ## License
 
