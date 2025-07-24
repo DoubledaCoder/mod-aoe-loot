@@ -25,6 +25,10 @@ using namespace WorldPackets;
 std::map<uint64, bool> playerAoeLootEnabled;
 std::map<uint64, bool> playerAoeLootDebug;
 
+// Server packet handler. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
+// >>>>> This is the entry point. This packet triggers the AOE loot system. <<<<< //
+
 bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
 {
     if (packet.GetOpcode() == CMSG_LOOT)
@@ -47,7 +51,11 @@ bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
     return true;
 }
 
-// Command table implementation
+// Server packet handler end. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< //
+
+
+// Command table implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
 ChatCommandTable AoeLootCommandScript::GetCommands() const
 {
     static ChatCommandTable aoeLootSubCommandTable =
@@ -57,7 +65,7 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
         { "on",             HandleAoeLootOnCommand,             SEC_PLAYER, Console::No },
         { "off",            HandleAoeLootOffCommand,            SEC_PLAYER, Console::No },
         { "debug on",       HandleAoeLootDebugOnCommand,        SEC_PLAYER, Console::No },
-        { "debug toggle",   HandleAoeLootDebugToggleCommand,    SEC_PLAYER, Console::No },
+        { "debug",          HandleAoeLootDebugToggleCommand,    SEC_PLAYER, Console::No },
         { "debug off",      HandleAoeLootDebugOffCommand,       SEC_PLAYER, Console::No }
     };
 
@@ -69,7 +77,11 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
     return aoeLootCommandTable;
 }
 
-// Command handlers implementation
+// Command table implementation end. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< //
+
+
+// Command handlers implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
 bool AoeLootCommandScript::HandleAoeLootOnCommand(ChatHandler* handler, Optional<std::string> /*args*/)
 {
     if (!sConfigMgr->GetOption<bool>("AOELoot.Enable", true))
@@ -138,7 +150,13 @@ bool AoeLootCommandScript::HandleAoeLootDebugToggleCommand(ChatHandler* handler,
     return true;
 }
 
-// Helper function for debug messages:
+// Command handlers implementation End. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< //
+
+
+// Helper functions. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
+// >>>>> Debugger message function. <<<<< //
+
 void AoeLootCommandScript::DebugMessage(Player* player, const std::string& message)
 {
     if (sConfigMgr->GetOption<bool>("AOELoot.Debug", false) || playerAoeLootDebug[player->GetGUID().GetRawValue()])
@@ -147,7 +165,6 @@ void AoeLootCommandScript::DebugMessage(Player* player, const std::string& messa
     }
 }
 
-// Helper function to get group members once:
 std::vector<Player*> AoeLootCommandScript::GetGroupMembers(Player* player)
 {
     std::vector<Player*> members;
@@ -164,20 +181,17 @@ std::vector<Player*> AoeLootCommandScript::GetGroupMembers(Player* player)
     return members;
 }
 
-// Helper function to check if a creature is a valid loot target
 bool AoeLootCommandScript::IsValidLootTarget(Player* player, Creature* creature)
 {
     if (!creature || !player)
         return false;
 
-    // Basic checks
     if (creature->IsAlive())
         return false;
         
     if (creature->loot.empty() || creature->loot.isLooted())
         return false;
 
-    // Check AOE loot is enabled for this player
     uint64 playerGuid = player->GetGUID().GetRawValue();
     if (playerAoeLootEnabled.find(playerGuid) == playerAoeLootEnabled.end() || 
         !playerAoeLootEnabled[playerGuid])
@@ -186,13 +200,13 @@ bool AoeLootCommandScript::IsValidLootTarget(Player* player, Creature* creature)
     return true;
 }
 
-// Process quest items
 void AoeLootCommandScript::ProcessQuestItems(Player* player, ObjectGuid lguid, Loot* loot)
 {
     if (!player || !loot)
         return;
         
-    // Process different quest item types
+    // >>>>> Process different quest item types. <<<<< //
+
     const QuestItemMap& questItems = loot->GetPlayerQuestItems();
     for (uint8 i = 0; i < questItems.size(); ++i)
     {
@@ -209,12 +223,12 @@ void AoeLootCommandScript::ProcessQuestItems(Player* player, ObjectGuid lguid, L
     }
 }
 
-// Replace the large if/else chain with this:
 std::pair<Loot*, bool> AoeLootCommandScript::GetLootObject(Player* player, ObjectGuid lguid)
 {
     if (lguid.IsGameObject())
     {
-        // Skip GameObjects for AOE loot
+        // >>>>> This protects against looting Game Objects and Structures <<<<< //
+
         DebugMessage(player, "Skipping GameObject - not supported for AOE loot");
         return {nullptr, false};
     }
@@ -260,9 +274,8 @@ bool AoeLootCommandScript::HandleStartAoeLootCommand(ChatHandler* handler, Optio
     if (!player)
         return true;
 
-    float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f); // Do not remove the hardcoded value. It is here for crash protection.
+    float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f); // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
     
-    // Get valid corpses
     auto validCorpses = GetValidCorpses(player, range);
 
     uint32 CorpseThreshold = sConfigMgr->GetOption<uint32>("AOELoot.CorpseThreshold", 2);
@@ -272,7 +285,6 @@ bool AoeLootCommandScript::HandleStartAoeLootCommand(ChatHandler* handler, Optio
         return true;
     }
     
-    // Process each corpse
     for (auto* creature : validCorpses)
     {
         ProcessCreatureLoot(player, creature);
@@ -281,7 +293,6 @@ bool AoeLootCommandScript::HandleStartAoeLootCommand(ChatHandler* handler, Optio
     return true;
 }
 
-// Helper function to get valid corpses:
 std::vector<Creature*> AoeLootCommandScript::GetValidCorpses(Player* player, float range)
 {
     std::list<Creature*> nearbyCorpses;
@@ -295,12 +306,11 @@ std::vector<Creature*> AoeLootCommandScript::GetValidCorpses(Player* player, flo
         if (IsValidLootTarget(player, creature))
             validCorpses.push_back(creature);
     }
-    
+
     DebugMessage(player, fmt::format("Found {} valid corpses", validCorpses.size()));
     return validCorpses;
 }
 
-// Helper function to process one creature:
 void AoeLootCommandScript::ProcessCreatureLoot(Player* player, Creature* creature)
 {
     ObjectGuid lguid = creature->GetGUID();
@@ -308,47 +318,48 @@ void AoeLootCommandScript::ProcessCreatureLoot(Player* player, Creature* creatur
     
     if (!loot)
         return;
-        
+
+    ObjectGuid originalLootGuid = player->GetLootGUID();    
     player->SetLootGUID(lguid);
     
-    // Process quest items
     ProcessQuestItems(player, lguid, loot);
     
-    // Process regular items
     for (uint8 lootSlot = 0; lootSlot < loot->items.size(); ++lootSlot)
     {
         ProcessLootSlot(player, lguid, lootSlot);
     }
     
-    // Handle money
     if (loot->gold > 0)
     {
         ProcessLootMoney(player, creature);
     }
     
-    // Clean up if fully looted
     if (loot->isLooted())
     {
         ProcessLootRelease(lguid, player, loot);
     }
+    player->SetLootGUID(originalLootGuid);
 }
 
-// Core loot processing functions
 bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uint8 lootSlot)
 {
     if (!player)
         return false;
 
     auto [loot, isValid] = GetLootObject(player, lguid);
-    if (!isValid || !loot || lootSlot >= loot->items.size())
+
+    if 
+    (
+        !isValid                        || 
+        !loot                           || 
+        lootSlot >= loot->items.size()
+    )
         return false;
 
-    // Use the standard loot system - let it handle group logic
     InventoryResult msg = EQUIP_ERR_OK;
     LootItem* lootItem = player->StoreLootItem(lootSlot, loot, msg);
     if (!lootItem)
     {
-         // Handle specific error messages
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: inventory error {}", lootSlot, lguid.ToString(), static_cast<uint32>(msg)));
         return false;
     }
@@ -356,7 +367,6 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     return true;
 }
 
-// Handle gold looting
 bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
 {
     if (!player || !creature || creature->loot.gold == 0)
@@ -369,8 +379,8 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
     {
         std::vector<Player*> nearbyMembers;
 
-        float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f);
-        float moneyShareMultiplier = sConfigMgr->GetOption<float>("AOELoot.MoneyShareDistanceMultiplier", 2.0f);
+        float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f); // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+        float moneyShareMultiplier = sConfigMgr->GetOption<float>("AOELoot.MoneyShareDistanceMultiplier", 2.0f); // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
         
         for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
         {
@@ -391,7 +401,6 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
     }
     else
     {
-        // Solo player gets all gold
         player->ModifyMoney(goldAmount);
         ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: +{} gold", goldAmount);
     }
@@ -400,7 +409,6 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
     return true;
 }
 
-// loot release
 void AoeLootCommandScript::ProcessLootRelease(ObjectGuid lguid, Player* player, Loot* loot)
 {
     if (!player || !loot)
@@ -409,7 +417,6 @@ void AoeLootCommandScript::ProcessLootRelease(ObjectGuid lguid, Player* player, 
     player->SetLootGUID(ObjectGuid::Empty);
     player->SendLootRelease(lguid);
     
-    // Handle creature-specific cleanup
     if (lguid.IsCreature())
     {
         Creature* creature = player->GetMap()->GetCreature(lguid);
@@ -423,18 +430,19 @@ void AoeLootCommandScript::ProcessLootRelease(ObjectGuid lguid, Player* player, 
     DebugMessage(player, fmt::format("Released loot for {}", lguid.ToString()));
 }
 
-
-// Display login message to player
 void AoeLootPlayer::OnPlayerLogin(Player* player)
 {
     if (sConfigMgr->GetOption<bool>("AOELoot.Enable", true) && 
         sConfigMgr->GetOption<bool>("AOELoot.Message", true))
     {
-        ChatHandler(player->GetSession()).PSendSysMessage("AOE looting has been enabled for your character. Type: '.aoeloot off' to turn AoE Looting Off.");
+        ChatHandler(player->GetSession()).PSendSysMessage("AOE looting has been enabled for your character. Commands: aoeloot debug | aoeloot off | aoeloot on");
     }
 }
 
-// Add script registrations
+// Helper functions end. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
+// >>>>> Add the scripts for registration as a module. <<<<< //
+
 void AddSC_AoeLoot()
 {
     new AoeLootPlayer();
