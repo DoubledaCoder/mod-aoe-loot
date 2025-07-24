@@ -44,6 +44,7 @@ bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
                 playerAoeLootEnabled[guid])
             {
                 // >>>>> Aoe loot start. <<<<< //
+                
                 ChatHandler handler(player->GetSession());
                 handler.ParseCommands(".aoeloot startaoeloot");
             }
