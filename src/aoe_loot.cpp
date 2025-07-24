@@ -255,7 +255,7 @@ std::pair<Loot*, bool> AoeLootCommandScript::GetLootObject(Player* player, Objec
         }
         return {&bones->loot, true};
     }
-    else // Creature
+    else // >>>>> Creature <<<<< //
     {
         Creature* creature = player->GetMap()->GetCreature(lguid);
         if (!creature)
