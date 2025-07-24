@@ -74,7 +74,7 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
 
     static ChatCommandTable aoeLootCommandTable =
     {
-        { "aoeloot", aoeLootSubCommandTable }
+        { "aoeloot",        aoeLootSubCommandTable }
     };
     
     return aoeLootCommandTable;
