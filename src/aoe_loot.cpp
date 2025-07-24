@@ -445,7 +445,7 @@ void AoeLootPlayer::OnPlayerLogin(Player* player)
     if (sConfigMgr->GetOption<bool>("AOELoot.Enable", true) && 
         sConfigMgr->GetOption<bool>("AOELoot.Message", true))
     {
-        ChatHandler(player->GetSession()).PSendSysMessage("AOE looting has been enabled for your character. Commands: aoeloot debug | aoeloot off | aoeloot on");
+        ChatHandler(player->GetSession()).PSendSysMessage("AOE looting has been enabled for your character. Commands: .aoeloot debug | .aoeloot off | .aoeloot on");
     }
 }
 
