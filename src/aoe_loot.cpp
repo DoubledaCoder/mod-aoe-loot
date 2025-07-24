@@ -25,7 +25,7 @@ using namespace WorldPackets;
 std::map<uint64, bool> playerAoeLootEnabled;
 std::map<uint64, bool> playerAoeLootDebug;
 
-// Server packet handler. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+// Server packet handler. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 // >>>>> This is the entry point. This packet triggers the AOE loot system. <<<<< //
 
@@ -37,12 +37,13 @@ bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
         if (player)
         {
             uint64 guid = player->GetGUID().GetRawValue();
+
+            // >>>>> Aoe looting enabled check. <<<<< //
             
-            // Only trigger AOE loot if player has it enabled
             if (playerAoeLootEnabled.find(guid) != playerAoeLootEnabled.end() && 
                 playerAoeLootEnabled[guid])
             {
-                // AOE loot trigger
+                // >>>>> Aoe loot start. <<<<< //
                 ChatHandler handler(player->GetSession());
                 handler.ParseCommands(".aoeloot startaoeloot");
             }
