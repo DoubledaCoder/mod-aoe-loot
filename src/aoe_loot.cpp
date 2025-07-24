@@ -229,6 +229,7 @@ std::pair<Loot*, bool> AoeLootCommandScript::GetLootObject(Player* player, Objec
 {
     if (lguid.IsGameObject())
     {
+        
         // >>>>> This protects against looting Game Objects and Structures <<<<< //
 
         DebugMessage(player, "Skipping GameObject - not supported for AOE loot");
