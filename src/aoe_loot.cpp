@@ -276,7 +276,9 @@ bool AoeLootCommandScript::HandleStartAoeLootCommand(ChatHandler* handler, Optio
     if (!player)
         return true;
 
-    float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f); // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+    // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+    
+    float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f);
     
     auto validCorpses = GetValidCorpses(player, range);
 
@@ -381,8 +383,13 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
     {
         std::vector<Player*> nearbyMembers;
 
-        float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f); // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
-        float moneyShareMultiplier = sConfigMgr->GetOption<float>("AOELoot.MoneyShareDistanceMultiplier", 2.0f); // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+        // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+        
+        float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f);
+
+        // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+        
+        float moneyShareMultiplier = sConfigMgr->GetOption<float>("AOELoot.MoneyShareDistanceMultiplier", 2.0f);
         
         for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
         {
