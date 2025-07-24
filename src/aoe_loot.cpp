@@ -406,7 +406,7 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
             for (Player* member : nearbyMembers)
             {
                 member->ModifyMoney(goldPerPlayer);
-                ChatHandler(member->GetSession()).PSendSysMessage("AOE Loot: +{} gold", goldPerPlayer);
+                ChatHandler(member->GetSession()).PSendSysMessage("AOE Loot: +{} copper", goldPerPlayer);
             }
         }
     }
