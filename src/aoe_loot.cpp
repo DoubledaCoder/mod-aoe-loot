@@ -43,6 +43,7 @@ bool AoeLootServer::CanPacketReceive(WorldSession* session, WorldPacket& packet)
             if (playerAoeLootEnabled.find(guid) != playerAoeLootEnabled.end() && 
                 playerAoeLootEnabled[guid])
             {
+                
                 // >>>>> Aoe loot start. <<<<< //
                 
                 ChatHandler handler(player->GetSession());
