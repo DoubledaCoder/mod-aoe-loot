@@ -52,8 +52,9 @@ Once installed and enabled, the module works automatically. When a player loots 
 
 | Command                     | Description                                   | Access Level |
 |-----------------------------|-----------------------------------------------|--------------|
-| `.aoeloot on`               | Enable AOE looting for your character         | Player       |
-| `.aoeloot off`              | Disable AOE looting for your character        | Player       |
+| `.aoeloot on`               | Enable AOE looting for your character.        | Player       |
+| `.aoeloot off`              | Disable AOE looting for your character.       | Player       |
+| `.aoeloot debug`            | Toggle the debugger for more details.         | Player       |
 
 ## Contributing
 
