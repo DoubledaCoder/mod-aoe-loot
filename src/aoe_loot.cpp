@@ -437,25 +437,31 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
 
     auto [loot, isValid] = GetLootObject(player, lguid);
 
-    if 
-    (
-        !isValid                                                            || 
-        !loot                                                               ||
-        !loot->items.size()                                                 ||
-        // no items in loot
-        lootSlot >= loot->items.size()                                      ||
-        // check if the requested loot slot is valid
-        !loot->items[lootSlot]                                              ||
-        // check if the item in the requested slot is valid
-        !player->CanLoot(loot->items[lootSlot])                             ||
-        // check if the player can loot the item
-        !player->CanLoot(loot->items[lootSlot]->GetItem())                  ||
-        // check if the player can loot the item
-        !player->CanLoot(loot->items[lootSlot]->GetItem()->GetTemplate)     ||
-        lootSlot >= loot->items.size()
-    )
+     // >>>>> Basic validation checks <<<<< //
+    if (!isValid || !loot)
     {
-        DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid loot or slot", lootSlot, lguid.ToString()));
+        DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid loot object", lootSlot, lguid.ToString()));
+        return false;
+    }
+
+    // >>>>> Check if loot has items <<<<< //
+    if (loot->items.empty() || lootSlot >= loot->items.size())
+    {
+        DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid slot or no items", lootSlot, lguid.ToString()));
+        return false;
+    }
+
+    // >>>>> Check if the specific loot item exists <<<<< //
+    LootItem* lootItem = loot->items[lootSlot];
+    if (!lootItem)
+    {
+        DebugMessage(player, fmt::format("Failed to loot slot {} of {}: no item in slot", lootSlot, lguid.ToString()));
+        return false;
+    }
+
+    if (lootItem->is_blocked || lootItem->is_looted)
+    {
+        DebugMessage(player, fmt::format("Failed to loot slot {} of {}: item is blocked", lootSlot, lguid.ToString()));
         return false;
     }
 
