@@ -47,10 +47,12 @@ bool AoeLootManager::CanPacketReceive(WorldSession* session, WorldPacket& packet
             // >>>>> Only trigger AOE loot if player has it enabled. <<<<< //
 
             // >>>>> Aoe looting enabled check. <<<<< //
+            
             if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid) && 
                 AoeLootCommandScript::GetPlayerAoeLootEnabled(guid))
             {
                 // >>>>> Aoe loot start. <<<<< //
+                
                 ChatHandler handler(player->GetSession());
                 handler.ParseCommands(".aoeloot startaoeloot");
             }
@@ -95,7 +97,7 @@ bool AoeLootCommandScript::GetPlayerAoeLootEnabled(uint64 guid)
     auto it = playerAoeLootEnabled.find(guid);
     if (it != playerAoeLootEnabled.end())
         return it->second;
-    return false; // Return false if not found   
+    return false; 
 }
 
 bool AoeLootCommandScript::GetPlayerAoeLootDebug(uint64 guid)
@@ -103,7 +105,7 @@ bool AoeLootCommandScript::GetPlayerAoeLootDebug(uint64 guid)
     auto it = playerAoeLootDebug.find(guid);
     if (it != playerAoeLootDebug.end())
         return it->second;
-    return false; // Return false if not found
+    return false;
 }
 
 void AoeLootCommandScript::SetPlayerAoeLootEnabled(uint64 guid, bool mode)
@@ -553,6 +555,7 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     auto [loot, isValid] = GetLootObject(player, lguid);
 
      // >>>>> Basic validation checks <<<<< //
+    
     if (!isValid || !loot)
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid loot object", lootSlot, lguid.ToString()));
@@ -560,6 +563,7 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     }
 
     // >>>>> Check if loot has items <<<<< //
+    
     if (loot->items.empty() || lootSlot >= loot->items.size())
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid slot or no items", lootSlot, lguid.ToString()));
@@ -567,6 +571,7 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     }
 
     // >>>>> Check if the specific loot item exists <<<<< //
+    
     LootItem& lootItem = loot->items[lootSlot];
 
     if (lootItem.is_blocked || lootItem.is_looted)
@@ -666,7 +671,9 @@ void AoeLootPlayer::OnPlayerLogin(Player* player)
 void AoeLootPlayer::OnPlayerLogout(Player* player)
     {
         uint64 guid = player->GetGUID().GetRawValue();
+        
         // >>>>> Clean up player data <<<<< //
+        
         if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid))
             AoeLootCommandScript::RemovePlayerLootEnabled(guid);
         if (AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
