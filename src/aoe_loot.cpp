@@ -88,7 +88,7 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
 // Command table implementation end. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< //
 
 
-// Getters and setters for player AOE loot settings. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+// Getters and setters for player AOE loot settings. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 bool AoeLootCommandScript::GetPlayerAoeLootEnabled(uint64 guid)
 {
@@ -175,7 +175,7 @@ bool AoeLootCommandScript::hasPlayerAoeLootDebug(uint64 guid)
 // Getters and setters end. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 
-// Command handlers implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+// Command handlers implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 bool AoeLootCommandScript::HandleAoeLootOnCommand(ChatHandler* handler, Optional<std::string> /*args*/)
 {
@@ -666,7 +666,7 @@ void AoeLootPlayer::OnPlayerLogin(Player* player)
 void AoeLootPlayer::OnPlayerLogout(Player* player)
     {
         uint64 guid = player->GetGUID().GetRawValue();
-        // Clean up player data
+        // >>>>> Clean up player data <<<<< //
         if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid))
             AoeLootCommandScript::RemovePlayerLootEnabled(guid);
         if (AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
