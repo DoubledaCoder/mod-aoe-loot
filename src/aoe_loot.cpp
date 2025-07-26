@@ -22,8 +22,8 @@
 using namespace Acore::ChatCommands;
 using namespace WorldPackets;
 
-std::map<uint64, bool> AoeLootManager::playerAoeLootEnabled;
-std::map<uint64, bool> AoeLootManager::playerAoeLootDebug;
+std::map<uint64, bool> AoeLootCommandScript::playerAoeLootEnabled;
+std::map<uint64, bool> AoeLootCommandScript::playerAoeLootDebug;
 
 
 // Server packet handler. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
@@ -41,14 +41,14 @@ bool AoeLootManager::CanPacketReceive(WorldSession* session, WorldPacket& packet
 
             // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
 
-            AoeLootManager::playerAoeLootEnabled[guid] = sConfigMgr->GetOption<bool>("AOELoot.Enable", true);
-            AoeLootManager::playerAoeLootDebug[guid] = sConfigMgr->GetOption<bool>("AOELoot.Debug", false);
+            AoeLootCommandScript::SetPlayerAoeLootEnabled(guid, sConfigMgr->GetOption<bool>("AOELoot.Enable", true));
+            AoeLootCommandScript::SetPlayerAoeLootDebug(guid, sConfigMgr->GetOption<bool>("AOELoot.Debug", false));
           
             // >>>>> Only trigger AOE loot if player has it enabled. <<<<< //
 
             // >>>>> Aoe looting enabled check. <<<<< //
-            if (AoeLootManager::playerAoeLootEnabled.find(guid) != AoeLootManager::playerAoeLootEnabled.end() && 
-                AoeLootManager::playerAoeLootEnabled[guid])
+            if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid) && 
+                AoeLootCommandScript::GetPlayerAoeLootEnabled(guid))
             {
                 // >>>>> Aoe loot start. <<<<< //
                 ChatHandler handler(player->GetSession());
@@ -88,29 +88,111 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
 // Command table implementation end. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< //
 
 
+// Getters and setters for player AOE loot settings. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
+bool AoeLootCommandScript::GetPlayerAoeLootEnabled(uint64 guid)
+{
+    auto it = playerAoeLootEnabled.find(guid);
+    if (it != playerAoeLootEnabled.end())
+        return it->second;
+    return false; // Return false if not found   
+}
+
+bool AoeLootCommandScript::GetPlayerAoeLootDebug(uint64 guid)
+{
+    auto it = playerAoeLootDebug.find(guid);
+    if (it != playerAoeLootDebug.end())
+        return it->second;
+    return false; // Return false if not found
+}
+
+void AoeLootCommandScript::SetPlayerAoeLootEnabled(uint64 guid, bool mode)
+{
+    if (playerAoeLootEnabled.find(guid) == playerAoeLootEnabled.end())
+    {
+        playerAoeLootEnabled[guid] = mode;
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Set AOE loot enabled for GUID {}: {}", guid, mode));
+    }
+    else
+    {
+        playerAoeLootEnabled[guid] = mode;
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Updated AOE loot enabled for GUID {}: {}", guid, mode));
+    }
+    AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Set AOE loot enabled for GUID {}: {}", guid, mode));
+}
+
+void AoeLootCommandScript::SetPlayerAoeLootDebug(uint64 guid, bool mode)
+{
+    if (playerAoeLootDebug.find(guid) == playerAoeLootDebug.end())
+    {
+        playerAoeLootDebug[guid] = mode;
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Set AOE loot debug for GUID {}: {}", guid, mode));
+    }
+    else
+    {
+        playerAoeLootDebug[guid] = mode;
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Updated AOE loot debug for GUID {}: {}", guid, mode));
+    }
+    AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Set AOE loot debug for GUID {}: {}", guid, mode));
+}
+
+void AoeLootCommandScript::RemovePlayerLootEnabled(uint64 guid)
+{
+    if (playerAoeLootEnabled.find(guid) != playerAoeLootEnabled.end())
+    {
+        playerAoeLootEnabled.erase(guid);
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Removed AOE loot enabled for GUID {}", guid));
+    }
+    else
+    {
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("No AOE loot enabled found for GUID {}", guid));
+    }
+}
+
+void AoeLootCommandScript::RemovePlayerLootDebug(uint64 guid)
+{
+    if (playerAoeLootDebug.find(guid) != playerAoeLootDebug.end())
+    {
+        playerAoeLootDebug.erase(guid);
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("Removed AOE loot debug for GUID {}", guid));
+    }
+    else
+    {
+        AoeLootCommandScript::DebugMessage(nullptr, fmt::format("No AOE loot debug found for GUID {}", guid));
+    }
+}
+
+bool AoeLootCommandScript::hasPlayerAoeLootEnabled(uint64 guid)
+{
+    return playerAoeLootEnabled.count(guid) > 0;
+}
+
+bool AoeLootCommandScript::hasPlayerAoeLootDebug(uint64 guid)
+{
+    return playerAoeLootDebug.count(guid) > 0;
+}
+
+// Getters and setters end. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
+
 // Command handlers implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 bool AoeLootCommandScript::HandleAoeLootOnCommand(ChatHandler* handler, Optional<std::string> /*args*/)
 {
-    if (!sConfigMgr->GetOption<bool>("AOELoot.Enable", true))
-    {
-        handler->PSendSysMessage("AOE Loot is disabled by server configuration.");
-        return true;
-    }
-    
     Player* player = handler->GetSession()->GetPlayer();
     if (!player)
         return true;
 
-    if (!AoeLootManager::playerAoeLootEnabled.count(player->GetGUID().GetRawValue()))
+    uint64 playerGuid = player->GetGUID().GetRawValue();
+
+    if(AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid))
     {
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] = true;
-        handler->PSendSysMessage("AOE looting has been enabled for your character. Type: '.aoeloot off' to turn AoE Looting Off.");
+        DebugMessage(player, "AOE Loot is already enabled for your character.");
+        handler->PSendSysMessage("AOE Loot is already enabled for your character.");
+        return true;
     }
-    else
-    {
-        handler->PSendSysMessage("AOE looting is already enabled for your character.");
-    }
+   
+
     return true;
 }
 
@@ -120,14 +202,17 @@ bool AoeLootCommandScript::HandleAoeLootOffCommand(ChatHandler* handler, Optiona
     if (!player)
         return true;
 
-    if (AoeLootManager::playerAoeLootEnabled.count(player->GetGUID().GetRawValue()) > 0)
+    uint64 playerGuid = player->GetGUID().GetRawValue();
+    if (AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid) && 
+        AoeLootCommandScript::GetPlayerAoeLootEnabled(playerGuid))
     {
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] = false;
-        handler->PSendSysMessage("AOE Loot disabled for your character.");
+        AoeLootCommandScript::SetPlayerAoeLootEnabled(playerGuid, false);
+        handler->PSendSysMessage("AOE Loot disabled for your character. Type: '.aoeloot on' to turn AoE Looting on.");
+        DebugMessage(player, "AOE Loot disabled for your character.");
     }
     else
     {
-        handler->PSendSysMessage("AOE Loot is not enabled for your character.");
+        handler->PSendSysMessage("AOE Loot is already disabled for your character.");
     }
     return true;
 }
@@ -138,31 +223,32 @@ bool AoeLootCommandScript::HandleAoeLootToggleCommand(ChatHandler* handler, Opti
     if (!player)
         return true;
 
-    if 
-    (
-        AoeLootManager::playerAoeLootEnabled.count(player->GetGUID().GetRawValue()) == 0    || 
-        !AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()]              || 
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] == false
-    ) 
+    uint64 playerGuid = player->GetGUID().GetRawValue();
+    if (!AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid))
     {
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] = true;
-        handler->PSendSysMessage("AOE Loot enabled for your character.");
+        AoeLootCommandScript::SetPlayerAoeLootEnabled(playerGuid, true);
+        handler->PSendSysMessage("AOE Loot enabled for your character. Type: '.aoeloot off' to turn AoE Looting off.");
+        DebugMessage(player, "AOE Loot enabled for your character.");
     }
-    else if (AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] == true)
+    else if (!AoeLootCommandScript::GetPlayerAoeLootEnabled(playerGuid))
     {
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] = false;
-        handler->PSendSysMessage("AOE Loot disabled for your character.");
+        AoeLootCommandScript::SetPlayerAoeLootEnabled(playerGuid, true);
+        handler->PSendSysMessage("AOE Loot is now enabled for your character. Type: '.aoeloot off' to turn AoE Looting off.");
+        DebugMessage(player, "AOE Loot is now enabled for your character.");
     }
-    else if (AoeLootManager::playerAoeLootEnabled.count(player->GetGUID().GetRawValue()) > 0)
+    else if (AoeLootCommandScript::GetPlayerAoeLootEnabled(playerGuid))
     {
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] = !AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()];
-        handler->PSendSysMessage("AOE Loot toggled for your character.");
+        AoeLootCommandScript::SetPlayerAoeLootEnabled(playerGuid, false);
+        handler->PSendSysMessage("AOE Loot is now disabled for your character. Type: '.aoeloot on' to turn AoE Looting on.");
+        DebugMessage(player, "AOE Loot is now disabled for your character.");
     }
     else
     {
-        AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()] = !AoeLootManager::playerAoeLootEnabled[player->GetGUID().GetRawValue()];
-        handler->PSendSysMessage("AOE Loot toggled for your character.");
-    }
+        AoeLootCommandScript::SetPlayerAoeLootEnabled(playerGuid, false);
+        handler->PSendSysMessage("AOE Loot disabled for your character. Type: '.aoeloot on' to turn AoE Looting on.");
+        DebugMessage(player, "AOE Loot disabled for your character.");
+    }   
+
     return true;
 }
 
@@ -172,20 +258,24 @@ bool AoeLootCommandScript::HandleAoeLootDebugOnCommand(ChatHandler* handler, Opt
     if (!player)
         return true;
 
-    if (AoeLootManager::playerAoeLootDebug.count(player->GetGUID().GetRawValue()) == 0)
+    if (AoeLootCommandScript::hasPlayerAoeLootDebug(player->GetGUID().GetRawValue()) == 0)
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = true;
-        handler->PSendSysMessage("AOE Loot debug mode enabled.");
-    }
-    else if (!AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()])
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), true);
+        handler->PSendSysMessage("AOE Loot debug mode enabled for your character.");
+        DebugMessage(player, "AOE Loot debug mode enabled for your character.");
+    }   
+    else if (!AoeLootCommandScript::GetPlayerAoeLootDebug(player->GetGUID().GetRawValue()))
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = true;
-        handler->PSendSysMessage("AOE Loot debug mode is now enabled.");
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), true);
+        handler->PSendSysMessage("AOE Loot debug mode is now enabled for your character.");
+        DebugMessage(player, "AOE Loot debug mode is now enabled for your character.");
     }
     else
     {
-        handler->PSendSysMessage("AOE Loot debug mode is already enabled.");
+        handler->PSendSysMessage("AOE Loot debug mode is already enabled for your character.");
     }
+    DebugMessage(player, "AOE Loot debug mode enabled for your character.");
+
     return true;
 }
 
@@ -195,15 +285,25 @@ bool AoeLootCommandScript::HandleAoeLootDebugOffCommand(ChatHandler* handler, Op
     if (!player)
         return true;
 
-    if (AoeLootManager::playerAoeLootDebug.count(player->GetGUID().GetRawValue()) > 0)
+    if (AoeLootCommandScript::hasPlayerAoeLootDebug(player->GetGUID().GetRawValue()) > 0 && 
+        AoeLootCommandScript::GetPlayerAoeLootDebug(player->GetGUID().GetRawValue()) == true)
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = false;
-        handler->PSendSysMessage("AOE Loot debug mode disabled.");
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), false);
+        handler->PSendSysMessage("AOE Loot debug mode disabled for your character.");
+        DebugMessage(player, "AOE Loot debug mode disabled for your character.");
+    }
+    else if (AoeLootCommandScript::hasPlayerAoeLootDebug(player->GetGUID().GetRawValue()) > 0 && 
+             AoeLootCommandScript::GetPlayerAoeLootDebug(player->GetGUID().GetRawValue()) == false)
+    {
+        handler->PSendSysMessage("AOE Loot debug mode is already disabled for your character.");
+        DebugMessage(player, "AOE Loot debug mode is already disabled for your character.");
     }
     else
     {
         handler->PSendSysMessage("AOE Loot debug mode is not enabled for your character.");
+        DebugMessage(player, "AOE Loot debug mode is not enabled for your character.");
     }
+
     return true;
 }
 
@@ -213,26 +313,27 @@ bool AoeLootCommandScript::HandleAoeLootDebugToggleCommand(ChatHandler* handler,
     if (!player)
         return true;
 
-    if (AoeLootManager::playerAoeLootDebug.count(player->GetGUID().GetRawValue()) == 0)
+    if (AoeLootCommandScript::hasPlayerAoeLootDebug(player->GetGUID().GetRawValue()) == 0)
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = true;
-        handler->PSendSysMessage("AOE Loot debug mode enabled.");
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), true);
+        handler->PSendSysMessage("AOE Loot debug mode enabled for your character.");
     }
-    else if (!AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()])
+    else if (AoeLootCommandScript::GetPlayerAoeLootDebug(player->GetGUID().GetRawValue()) == false)
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = true;
-        handler->PSendSysMessage("AOE Loot debug mode is now enabled.");
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), true);
+        handler->PSendSysMessage("AOE Loot debug mode is now enabled for your character."); 
     }
-    else if (AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()])
+    else if (AoeLootCommandScript::GetPlayerAoeLootDebug(player->GetGUID().GetRawValue()) == true)
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = false;
-        handler->PSendSysMessage("AOE Loot debug mode is now disabled.");
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), false);
+        handler->PSendSysMessage("AOE Loot debug mode is now disabled for your character.");
     }
     else
     {
-        AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()] = false;
-        handler->PSendSysMessage("AOE Loot debug mode disabled.");
+        AoeLootCommandScript::SetPlayerAoeLootDebug(player->GetGUID().GetRawValue(), false);
+        handler->PSendSysMessage("AOE Loot debug mode disabled for your character.");
     }
+
     return true;
 }
 
@@ -245,7 +346,13 @@ bool AoeLootCommandScript::HandleAoeLootDebugToggleCommand(ChatHandler* handler,
 
 void AoeLootCommandScript::DebugMessage(Player* player, const std::string& message)
 {
-    if (sConfigMgr->GetOption<bool>("AOELoot.Debug", false) || AoeLootManager::playerAoeLootDebug[player->GetGUID().GetRawValue()])
+    if (!player)
+        return;
+
+    uint64 guid = player->GetGUID().GetRawValue();
+
+    if (sConfigMgr->GetOption<bool>("AOELoot.Debug", false) && 
+        AoeLootCommandScript::GetPlayerAoeLootDebug(guid))
     {
         ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: {}", message);
     }
@@ -279,9 +386,17 @@ bool AoeLootCommandScript::IsValidLootTarget(Player* player, Creature* creature)
         return false;
 
     uint64 playerGuid = player->GetGUID().GetRawValue();
-    if (AoeLootManager::playerAoeLootEnabled.find(playerGuid) == AoeLootManager::playerAoeLootEnabled.end() || 
-        !AoeLootManager::playerAoeLootEnabled[playerGuid])
+    if (!AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid))
+    {
+        DebugMessage(player, "Player AOE loot setting not found.");
         return false;
+    }
+
+    if (!AoeLootCommandScript::GetPlayerAoeLootEnabled(playerGuid))
+    {
+        DebugMessage(player, "Player AOE loot is disabled.");
+        return false;
+    }
 
     return true;
 }
@@ -452,22 +567,17 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     }
 
     // >>>>> Check if the specific loot item exists <<<<< //
-    LootItem* lootItem = loot->items[lootSlot];
-    if (!lootItem)
-    {
-        DebugMessage(player, fmt::format("Failed to loot slot {} of {}: no item in slot", lootSlot, lguid.ToString()));
-        return false;
-    }
+    LootItem& lootItem = loot->items[lootSlot];
 
-    if (lootItem->is_blocked || lootItem->is_looted)
+    if (lootItem.is_blocked || lootItem.is_looted)
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: item is blocked", lootSlot, lguid.ToString()));
         return false;
     }
 
     InventoryResult msg = EQUIP_ERR_OK;
-    LootItem* lootItem = player->StoreLootItem(lootSlot, loot, msg);
-    if (!lootItem)
+    LootItem* storedItem = player->StoreLootItem(lootSlot, loot, msg);
+    if (!storedItem)
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: inventory error {}", lootSlot, lguid.ToString(), static_cast<uint32>(msg)));
         return false;
@@ -557,13 +667,15 @@ void AoeLootPlayer::OnPlayerLogout(Player* player)
     {
         uint64 guid = player->GetGUID().GetRawValue();
         // Clean up player data
-        if (AoeLootManager::playerAoeLootEnabled.count(guid))
-            AoeLootManager::playerAoeLootEnabled.erase(guid);
-        if (AoeLootManager::playerAoeLootDebug.count(guid))
-            AoeLootManager::playerAoeLootDebug.erase(guid);
+        if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid))
+            AoeLootCommandScript::RemovePlayerLootEnabled(guid);
+        if (AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
+            AoeLootCommandScript::RemovePlayerLootDebug(guid);
     }
 
 // Helper functions end. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+
+
 
 // >>>>> Add the scripts for registration as a module. <<<<< //
 
