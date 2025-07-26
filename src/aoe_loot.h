@@ -23,12 +23,10 @@ using namespace Acore::ChatCommands;
 
 class AoeLootManager : public ServerScript
 {
-private:
-    static std::map<uint64, bool> playerAoeLootEnabled;
-    static std::map<uint64, bool> playerAoeLootDebug;
 
 public:
-    AoeLootManager() : ServerScript("AoeLootServer") {}
+    AoeLootManager() : ServerScript("AoeLootManager") {}
+    
     bool CanPacketReceive(WorldSession* session, WorldPacket& packet) override;
 };
 
@@ -79,6 +77,20 @@ public:
     static std::vector<Creature*> GetValidCorpses(Player* player, float range);
     static void ProcessCreatureLoot(Player* player, Creature* creature);
     static bool IsValidLootTarget(Player* player, Creature* creature);
+
+    // Getters and setters for player AOE loot settings
+    static bool GetPlayerAoeLootEnabled(uint64 guid);
+    static bool GetPlayerAoeLootDebug(uint64 guid);
+    static void SetPlayerAoeLootEnabled(uint64 guid, bool mode);
+    static void SetPlayerAoeLootDebug(uint64 guid, bool mode);
+    static void RemovePlayerLootEnabled(uint64 guid);
+    static void RemovePlayerLootDebug(uint64 guid);
+    static bool hasPlayerAoeLootEnabled(uint64 guid);
+    static bool hasPlayerAoeLootDebug(uint64 guid);
+
+private:
+    static std::map<uint64, bool> playerAoeLootEnabled;
+    static std::map<uint64, bool> playerAoeLootDebug;
 
 };
 
