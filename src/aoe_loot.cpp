@@ -41,18 +41,23 @@ bool AoeLootManager::CanPacketReceive(WorldSession* session, WorldPacket& packet
 
             // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
 
-            AoeLootCommandScript::SetPlayerAoeLootEnabled(guid, sConfigMgr->GetOption<bool>("AOELoot.Enable", true));
-            AoeLootCommandScript::SetPlayerAoeLootDebug(guid, sConfigMgr->GetOption<bool>("AOELoot.Debug", false));
-          
-            // >>>>> Only trigger AOE loot if player has it enabled. <<<<< //
+            if (!AoeLootCommandScript::hasPlayerAoeLootEnabled(guid))
+            {
+                AoeLootCommandScript::SetPlayerAoeLootEnabled(guid, sConfigMgr->GetOption<bool>("AOELoot.Enable", true));
+            }
+            if (!AoeLootCommandScript::hasPlayerAoeLootDebug(guid)) 
+            {
+                AoeLootCommandScript::SetPlayerAoeLootDebug(guid, sConfigMgr->GetOption<bool>("AOELoot.Debug", false));
+            }
 
             // >>>>> Aoe looting enabled check. <<<<< //
-            
-            if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid) && 
-                AoeLootCommandScript::GetPlayerAoeLootEnabled(guid))
+
+            if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid) && AoeLootCommandScript::GetPlayerAoeLootEnabled(guid))
             {
+
                 // >>>>> Aoe loot start. <<<<< //
-                
+
+                AoeLootCommandScript::DebugMessage(player, "AOE Looting started.");
                 ChatHandler handler(player->GetSession());
                 handler.ParseCommands(".aoeloot startaoeloot");
             }
@@ -90,14 +95,14 @@ ChatCommandTable AoeLootCommandScript::GetCommands() const
 // Command table implementation end. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< //
 
 
-// Getters and setters for player AOE loot settings. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+// Getters and setters for player AOE loot settings. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 bool AoeLootCommandScript::GetPlayerAoeLootEnabled(uint64 guid)
 {
     auto it = playerAoeLootEnabled.find(guid);
     if (it != playerAoeLootEnabled.end())
         return it->second;
-    return false; 
+    return false;  
 }
 
 bool AoeLootCommandScript::GetPlayerAoeLootDebug(uint64 guid)
@@ -177,7 +182,7 @@ bool AoeLootCommandScript::hasPlayerAoeLootDebug(uint64 guid)
 // Getters and setters end. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 
-// Command handlers implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
+// Command handlers implementation. >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> //
 
 bool AoeLootCommandScript::HandleAoeLootOnCommand(ChatHandler* handler, Optional<std::string> /*args*/)
 {
@@ -187,14 +192,20 @@ bool AoeLootCommandScript::HandleAoeLootOnCommand(ChatHandler* handler, Optional
 
     uint64 playerGuid = player->GetGUID().GetRawValue();
 
-    if(AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid))
+    if (AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid) && 
+        AoeLootCommandScript::GetPlayerAoeLootEnabled(playerGuid))
     {
-        DebugMessage(player, "AOE Loot is already enabled for your character.");
         handler->PSendSysMessage("AOE Loot is already enabled for your character.");
         return true;
     }
+    if (AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid) && 
+        !AoeLootCommandScript::GetPlayerAoeLootEnabled(playerGuid))
+    {
+        AoeLootCommandScript::SetPlayerAoeLootEnabled(playerGuid, true);
+        handler->PSendSysMessage("AOE Loot enabled for your character. Type: '.aoeloot off' to turn AoE Looting off.");
+        return true;
+    }
    
-
     return true;
 }
 
@@ -353,9 +364,10 @@ void AoeLootCommandScript::DebugMessage(Player* player, const std::string& messa
 
     uint64 guid = player->GetGUID().GetRawValue();
 
-    if (sConfigMgr->GetOption<bool>("AOELoot.Debug", false) && 
-        AoeLootCommandScript::GetPlayerAoeLootDebug(guid))
+    if (AoeLootCommandScript::GetPlayerAoeLootDebug(guid) && AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
     {
+        // >>>>> This will send debug messages to the player. <<<<< //
+
         ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: {}", message);
     }
 }
@@ -555,7 +567,6 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     auto [loot, isValid] = GetLootObject(player, lguid);
 
      // >>>>> Basic validation checks <<<<< //
-    
     if (!isValid || !loot)
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid loot object", lootSlot, lguid.ToString()));
@@ -563,7 +574,6 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     }
 
     // >>>>> Check if loot has items <<<<< //
-    
     if (loot->items.empty() || lootSlot >= loot->items.size())
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid slot or no items", lootSlot, lguid.ToString()));
@@ -571,7 +581,6 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     }
 
     // >>>>> Check if the specific loot item exists <<<<< //
-    
     LootItem& lootItem = loot->items[lootSlot];
 
     if (lootItem.is_blocked || lootItem.is_looted)
@@ -631,7 +640,7 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
     else
     {
         player->ModifyMoney(goldAmount);
-        ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: +{} gold", goldAmount);
+        ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: +{} copper", goldAmount);
     }
     
     creature->loot.gold = 0;
@@ -671,9 +680,7 @@ void AoeLootPlayer::OnPlayerLogin(Player* player)
 void AoeLootPlayer::OnPlayerLogout(Player* player)
     {
         uint64 guid = player->GetGUID().GetRawValue();
-        
-        // >>>>> Clean up player data <<<<< //
-        
+        // Clean up player data
         if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid))
             AoeLootCommandScript::RemovePlayerLootEnabled(guid);
         if (AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
