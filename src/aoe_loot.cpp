@@ -366,6 +366,7 @@ void AoeLootCommandScript::DebugMessage(Player* player, const std::string& messa
 
     if (AoeLootCommandScript::GetPlayerAoeLootDebug(guid) && AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
     {
+        
         // >>>>> This will send debug messages to the player. <<<<< //
 
         ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: {}", message);
@@ -399,6 +400,9 @@ bool AoeLootCommandScript::IsValidLootTarget(Player* player, Creature* creature)
     if (creature->loot.empty() || creature->loot.isLooted())
         return false;
 
+    if (!creature->HasDynamicFlag(UNIT_DYNFLAG_LOOTABLE))
+        return false;
+
     uint64 playerGuid = player->GetGUID().GetRawValue();
     if (!AoeLootCommandScript::hasPlayerAoeLootEnabled(playerGuid))
     {
@@ -411,7 +415,8 @@ bool AoeLootCommandScript::IsValidLootTarget(Player* player, Creature* creature)
         DebugMessage(player, "Player AOE loot is disabled.");
         return false;
     }
-
+    
+    DebugMessage(player, fmt::format("Valid loot target found: {}", creature->GetName()));
     return true;
 }
 
@@ -537,13 +542,22 @@ void AoeLootCommandScript::ProcessCreatureLoot(Player* player, Creature* creatur
     if (!loot)
         return;
 
+    // >>>>> Save original loot GUID to restore later <<<<< //
+
     ObjectGuid originalLootGuid = player->GetLootGUID();    
+    
+    // >>>>> This ensures group roll system works correctly for each item <<<<< //
+
     player->SetLootGUID(lguid);
     
     ProcessQuestItems(player, lguid, loot);
     
     for (uint8 lootSlot = 0; lootSlot < loot->items.size(); ++lootSlot)
     {
+
+        // >>>>> Reset loot GUID for each item to ensure proper group roll handling <<<<< //
+
+        player->SetLootGUID(lguid);
         ProcessLootSlot(player, lguid, lootSlot);
     }
     
@@ -556,6 +570,9 @@ void AoeLootCommandScript::ProcessCreatureLoot(Player* player, Creature* creatur
     {
         ProcessLootRelease(lguid, player, loot);
     }
+    
+    // >>>>> Restore original loot GUID after processing <<<<< //
+
     player->SetLootGUID(originalLootGuid);
 }
 
@@ -567,13 +584,15 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     auto [loot, isValid] = GetLootObject(player, lguid);
 
      // >>>>> Basic validation checks <<<<< //
-    if (!isValid || !loot)
+
+    if (!player || !lguid || lguid.IsEmpty())
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid loot object", lootSlot, lguid.ToString()));
         return false;
     }
 
     // >>>>> Check if loot has items <<<<< //
+
     if (loot->items.empty() || lootSlot >= loot->items.size())
     {
         DebugMessage(player, fmt::format("Failed to loot slot {} of {}: invalid slot or no items", lootSlot, lguid.ToString()));
@@ -581,7 +600,10 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
     }
 
     // >>>>> Check if the specific loot item exists <<<<< //
+
+    Group* group = player->GetGroup();
     LootItem& lootItem = loot->items[lootSlot];
+    InventoryResult msg = EQUIP_ERR_OK;
 
     if (lootItem.is_blocked || lootItem.is_looted)
     {
@@ -589,7 +611,50 @@ bool AoeLootCommandScript::ProcessLootSlot(Player* player, ObjectGuid lguid, uin
         return false;
     }
 
-    InventoryResult msg = EQUIP_ERR_OK;
+    
+    bool isGroupLoot = false;
+    bool isRoundRobin = false;
+    LootMethod lootMethod = GROUP_LOOT;
+    
+    if (group)
+    {
+        lootMethod = group->GetLootMethod();
+        isGroupLoot = (lootMethod == GROUP_LOOT || lootMethod == NEED_BEFORE_GREED);
+        isRoundRobin = (lootMethod == ROUND_ROBIN);
+    }
+    if (group && !loot->items[lootSlot].is_underthreshold && isGroupLoot && 
+        lootMethod != FREE_FOR_ALL && lootMethod != MASTER_LOOT &&
+        !loot->items[lootSlot].is_blocked && !loot->items[lootSlot].is_looted)
+    {        
+        if (lguid.IsCreature())
+        {
+            Creature* creature = player->GetMap()->GetCreature(lguid);
+            if (creature)
+            {
+                group->NeedBeforeGreed(loot, creature);
+                DebugMessage(player, fmt::format("Started group roll for above-threshold item in slot {} of {}", lootSlot, lguid.ToString()));
+                return true;
+            }
+        }
+    }
+    else if 
+    (
+        group                       && 
+        lootMethod == MASTER_LOOT   && 
+        lootMethod != FREE_FOR_ALL
+    )
+    {
+        if (group->GetMasterLooterGuid() != player->GetGUID())
+        {
+            player->SendLootError(lguid, LOOT_ERROR_MASTER_OTHER);
+            return false;
+        }
+    }
+    else if (group && isRoundRobin && loot->roundRobinPlayer && loot->roundRobinPlayer != player->GetGUID())
+    {
+        return false;
+    }
+
     LootItem* storedItem = player->StoreLootItem(lootSlot, loot, msg);
     if (!storedItem)
     {
@@ -610,37 +675,51 @@ bool AoeLootCommandScript::ProcessLootMoney(Player* player, Creature* creature)
     
     if (group && sConfigMgr->GetOption<bool>("AOELoot.Group", true))
     {
-        std::vector<Player*> nearbyMembers;
+        std::vector<Player*> eligibleMembers;
 
-        // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
+        // >>>>> For AoE loot, we allow money sharing within a larger range. <<<<< //
         
         float range = sConfigMgr->GetOption<float>("AOELoot.Range", 55.0f);
-
-        // >>>>> Do not remove the hardcoded value. It is here for crash & data protection. <<<<< //
-        
         float moneyShareMultiplier = sConfigMgr->GetOption<float>("AOELoot.MoneyShareDistanceMultiplier", 2.0f);
+        float moneyRange = range * moneyShareMultiplier;
         
         for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
         {
             Player* member = itr->GetSource();
-            if (member && member->IsWithinDistInMap(player, range * moneyShareMultiplier))
-                nearbyMembers.push_back(member);
+            if (member && member->IsInWorld() && !member->isDead())
+            {
+                // >>>>> Check if the member is eligible for money sharing <<<<< //
+                
+                if (member->IsWithinDistInMap(player, moneyRange) || 
+                    member->IsAtLootRewardDistance(player))
+                {
+                    eligibleMembers.push_back(member);
+                }
+            }
         }
         
-        if (!nearbyMembers.empty())
+        if (!eligibleMembers.empty())
         {
-            uint32 goldPerPlayer = goldAmount / nearbyMembers.size();
-            for (Player* member : nearbyMembers)
+            uint32 goldPerPlayer = goldAmount / eligibleMembers.size();
+            for (Player* member : eligibleMembers)
             {
                 member->ModifyMoney(goldPerPlayer);
-                ChatHandler(member->GetSession()).PSendSysMessage("AOE Loot: +{} copper", goldPerPlayer);
+                member->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, goldPerPlayer);
+                DebugMessage(member, fmt::format("Received {} copper from AOE loot", goldPerPlayer));
             }
+        }
+        else
+        {
+            // >>>>> Fallback: give all money to the looter if no eligible members found <<<<< //
+            
+            player->ModifyMoney(goldAmount);
+            player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, goldAmount);
         }
     }
     else
     {
         player->ModifyMoney(goldAmount);
-        ChatHandler(player->GetSession()).PSendSysMessage("AOE Loot: +{} copper", goldAmount);
+        player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, goldAmount);
     }
     
     creature->loot.gold = 0;
@@ -680,7 +759,9 @@ void AoeLootPlayer::OnPlayerLogin(Player* player)
 void AoeLootPlayer::OnPlayerLogout(Player* player)
     {
         uint64 guid = player->GetGUID().GetRawValue();
-        // Clean up player data
+        
+        // >>>>> Clean up player data <<<<< //
+        
         if (AoeLootCommandScript::hasPlayerAoeLootEnabled(guid))
             AoeLootCommandScript::RemovePlayerLootEnabled(guid);
         if (AoeLootCommandScript::hasPlayerAoeLootDebug(guid))
