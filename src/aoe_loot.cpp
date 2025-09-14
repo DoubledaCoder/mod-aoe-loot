@@ -455,7 +455,8 @@ std::pair<Loot*, bool> AoeLootCommandScript::GetLootObject(Player* player, Objec
     }
     else if (lguid.IsItem())
     {
-        Item* pItem = player->GetItemByGuid(lguid);
+        //I'm guessing this is searching for whether the player already has an item in their inventory?
+        player::Item* pItem = player->GetItemByGuid(lguid);
         if (!pItem)
         {
             DebugMessage(player, fmt::format("Failed to find item {}", lguid.ToString()));
